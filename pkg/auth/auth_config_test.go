@@ -19,6 +19,15 @@ const (
 	token2v2         = "tokenV2"
 )
 
+func TestGitUrl(t *testing.T) {
+	t.Parallel()
+	c := &auth.AuthConfig{}
+	url := "https://foo.com/Bitbucket"
+	server := c.GetOrCreateServer(url)
+	assert.NotNil(t, server, "Failed to add the server to the configuration")
+	assert.Equal(t, 1, len(c.Servers), "No server found in the configuration")
+}
+
 func TestAuthConfig(t *testing.T) {
 	t.Parallel()
 	dir, err := ioutil.TempDir("", "jx-test-jenkins-config-")

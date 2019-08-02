@@ -205,3 +205,60 @@ func TestImportOptions_GetOrganisation(t *testing.T) {
 		})
 	}
 }
+
+func TestImportOptions_GetOrganisationNew(t *testing.T) {
+	var tests = []struct {
+		name    string
+		options cmd.ImportOptions
+		want    string
+	}{
+		{
+			name: "Get org from github URL (ignore user-specified org)",
+			options: cmd.ImportOptions{
+				RepoURL:      "https://github.com/Bitbucket/orga/myrepo",
+				Organisation: "orgb",
+				GitServer: &auth.AuthServer{
+					URL: "https://github.com/Bitbucket",
+				},
+			},
+			want: "orga",
+		},
+		{
+			name: "Get org from github URL (ignore user-specified org)",
+			options: cmd.ImportOptions{
+				RepoURL:      "https://github.com/orga/myrepo",
+				Organisation: "orgb",
+			},
+			want: "orga",
+		},
+		{
+			name: "Get org from github URL (no user-specified org)",
+			options: cmd.ImportOptions{
+				RepoURL: "https://github.com/orga/myrepo",
+			},
+			want: "orga",
+		},
+		{
+			name: "Get org from user flag",
+			options: cmd.ImportOptions{
+				RepoURL:      "https://myrepo.com/myrepo", // No org here
+				Organisation: "orgb",
+			},
+			want: "orgb",
+		},
+		{
+			name: "No org specified",
+			options: cmd.ImportOptions{
+				RepoURL: "https://myrepo.com/myrepo", // No org here
+			},
+			want: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.options.GetOrganisationNew(); got != tt.want {
+				t.Errorf("ImportOptions.GetOrganisation() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

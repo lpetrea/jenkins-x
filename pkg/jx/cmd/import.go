@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	v1 "github.com/jenkins-x/jx/pkg/apis/jenkins.io/v1"
+	"github.com/jenkins-x/jx/pkg/apis/jenkins.io/v1"
 	"sigs.k8s.io/yaml"
 
 	"github.com/cenkalti/backoff"
@@ -16,7 +16,7 @@ import (
 	"github.com/jenkins-x/jx/pkg/jenkinsfile"
 	"github.com/pkg/errors"
 
-	gojenkins "github.com/jenkins-x/golang-jenkins"
+	"github.com/jenkins-x/golang-jenkins"
 	"github.com/jenkins-x/jx/pkg/auth"
 	"github.com/jenkins-x/jx/pkg/gits"
 	"github.com/jenkins-x/jx/pkg/jenkins"
@@ -588,6 +588,78 @@ func (options *ImportOptions) GetOrganisation() string {
 		org = options.Organisation
 	}
 	return org
+}
+
+func (options *ImportOptions) GetOrganisationNew() string {
+	org := ""
+	gitInfo, err := ParseGitURL(options)
+	if err == nil && gitInfo.Organisation != "" {
+		org = gitInfo.Organisation
+		if options.Organisation != "" && org != options.Organisation {
+			log.Warnf("organisation %s detected from URL %s. '--org %s' will be ignored", org, options.RepoURL, options.Organisation)
+		}
+	} else {
+		org = options.Organisation
+	}
+	return org
+}
+
+const (
+	gitPrefix = "git@"
+)
+
+// ParseGitURL attempts to parse the given text as a URL or git URL-like string to determine
+// the protocol, host, organisation and name
+func ParseGitURL(options *ImportOptions) (*gits.GitRepository, error) {
+	repoUrl := options.RepoURL
+	gitServerUrl := options.GitServer.URL
+
+	if gitServerUrl != "" && strings.Contains(repoUrl, gitServerUrl) {
+		return ParseGitServerURL(options)
+	}
+
+	return gits.ParseGitURL(options.RepoURL)
+}
+
+func ParseGitServerURL(options *ImportOptions) (*gits.GitRepository, error) {
+	repoUrl := options.RepoURL
+	gitServerUrl := options.GitServer.URL
+
+	answer := gits.GitRepository{
+		URL:  repoUrl,
+		Host: gitServerUrl,
+	}
+
+	return parsePath(strings.TrimPrefix(repoUrl, gitServerUrl), &answer)
+}
+
+func parsePath(path string, info *gits.GitRepository) (*gits.GitRepository, error) {
+
+	// This is necessary for Bitbucket Server in some cases.
+	trimPath := strings.TrimPrefix(path, "/scm")
+
+	// This is necessary for Bitbucket Server in other cases
+	trimPath = strings.Replace(trimPath, "/projects", "", 1)
+	trimPath = strings.Replace(trimPath, "/repos", "", 1)
+
+	// Remove leading and trailing slashes so that splitting on "/" won't result
+	// in empty strings at the beginning & end of the array.
+	trimPath = strings.TrimPrefix(trimPath, "/")
+	trimPath = strings.TrimSuffix(trimPath, "/")
+
+	trimPath = strings.TrimSuffix(trimPath, ".git")
+
+	arr := strings.Split(trimPath, "/")
+	if len(arr) >= 2 {
+		// We're assuming the beginning of the path is of the form /<org>/<repo>
+		info.Organisation = arr[0]
+		info.Project = arr[0]
+		info.Name = arr[1]
+
+		return info, nil
+	}
+
+	return info, fmt.Errorf("Invalid path %s could not determine organisation and repository name", path)
 }
 
 // CreateNewRemoteRepository creates a new remote repository
